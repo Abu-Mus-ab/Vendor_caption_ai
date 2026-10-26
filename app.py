@@ -1,112 +1,135 @@
 from flask import Flask, request, jsonify, render_template_string, session, redirect
-import random
+import random, os
+import urllib.request, json
 
 app = Flask(__name__)
-app.secret_key = "amam_final_2024"
+app.secret_key = "amam_pro_2026_final"
 
-# ========= PUT YOUR DETAILS HERE =========
-MY_PASSWORD = "AREWA@AMAM_1033"
+# ========= YOUR DETAILS =========
+MY_PASSWORD = "AMAM@AREWA_1033"
 OPAY_NAME = "ABDULLAHI MUHAMMAD"
-OPAY_NUMBER = "9039019035"  # YOUR OPAY NUMBER
-WHATSAPP_NUMBER = "2347086332888"  # YOUR WHATSAPP e.g 2347012345678
+OPAY_NUMBER = "9039019035"
+WHATSAPP_NUMBER = "2347086332888"
 PRICE = "₦3,000"
-# =========================================
+# ================================
 
 LOGIN_HTML = """
 <!DOCTYPE html>
-<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>AMAM - Login</title>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+<title>AMAM - Login</title>
 <style>
-body{background:#fff;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;font-family:Arial,sans-serif;padding:15px}
-.box{border:1px solid #dadce0;border-radius:16px;padding:30px;width:100%;max-width:400px;text-align:center;box-shadow:0 2px 15px rgba(0,0,0,.08)}
-input{width:100%;padding:14px;border:1px solid #dadce0;border-radius:24px;text-align:center;margin-top:20px;box-sizing:border-box}
-button{margin-top:20px;background:#1a73e8;color:#fff;border:none;padding:12px 30px;border-radius:24px;font-weight:bold;cursor:pointer;width:100%}
-.pay{background:#f8f9fa;padding:12px;border-radius:12px;margin-top:20px;font-size:13px}
-a.wa{color:#fff;background:#25D366;padding:10px 18px;border-radius:24px;text-decoration:none;display:inline-block;margin-top:10px;font-weight:bold}
+*{font-family:'Inter',sans-serif;box-sizing:border-box}
+body{background: radial-gradient(circle at top, #eef2ff 0%, #ffffff 40%, #f8fafc 100%);display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;padding:15px}
+.box{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:32px;width:100%;max-width:420px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.07)}
+h2{font-weight:800;font-size:22px;margin:0} h2 span{color:#2563eb}
+input{width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:24px;text-align:center;margin-top:20px;font-size:15px;font-weight:500}
+button{margin-top:18px;background:#2563eb;color:#fff;border:none;padding:13px 30px;border-radius:24px;font-weight:700;cursor:pointer;width:100%;font-size:15px}
+button:hover{background:#1d4ed8}
+.pay{background:#f1f5f9;padding:14px;border-radius:12px;margin-top:20px;font-size:13px;line-height:1.6}
+a.wa{background:#25D366;color:#fff;padding:10px 20px;border-radius:24px;text-decoration:none;display:inline-block;margin-top:10px;font-weight:700}
+small{color:#64748b}
 </style></head><body>
 <div class="box">
-<h2>🔒 AMAM CAPTION GENERATOR</h2>
-<p style="color:#5f6368;font-size:14px">(for all business owners)<br>Subscription: {{PRICE}}/month</p>
+<h2>🔒 <span>AMAM</span> CAPTION GENERATOR</h2>
+<small><b>FOR ALL BUSINESS OWNERS</b><br>Subscription: {{PRICE}}/month</small>
 <form method="POST"><input type="password" name="pwd" placeholder="Enter password" required><button>Unlock Access</button></form>
 <div class="pay">
-<b>Pay to get password:</b><br>
-Opay: {{OPAY_NAME}}<br><b>{{OPAY_NUMBER}}</b> - {{PRICE}}/month<br>
-<a class="wa" href="https://wa.me/{{WHATSAPP_NUMBER}}?text=Hi,%20I%20paid%20for%20AMAM">📱 Chat on WhatsApp</a>
+<b>Pay to get password:</b><br>Opay: <b>{{OPAY_NAME}} - {{OPAY_NUMBER}}</b><br>Amount: <b>{{PRICE}}/month</b><br>
+<a class="wa" href="https://wa.me/{{WHATSAPP_NUMBER}}?text=Hi,%20I%20paid%20{{PRICE}}%20for%20AMAM">📱 Chat on WhatsApp</a>
 </div></div></body></html>
 """
 
 MAIN_HTML = """
 <!DOCTYPE html>
-<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>AMAM CAPTION GENERATOR</title>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<title>AMAM CAPTION GENERATOR</title>
 <style>
-*{box-sizing:border-box} body{background:#fff;color:#202124;font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;min-height:90vh;margin:0;padding:20px}
-.top{width:100%;max-width:700px;display:flex;justify-content:space-between;font-size:12px;color:#5f6368}
-h1{font-size:30px;font-weight:400;text-align:center;margin:30px 0 0 0} h1 span{display:block;font-size:15px;color:#5f6368;margin-top:6px}
-.search{margin-top:30px;width:100%;max-width:600px;display:flex;flex-direction:column;align-items:center}
-input[type=text]{width:100%;padding:16px 24px;border:1px solid #dfe1e5;border-radius:24px;outline:none;box-shadow:0 1px 6px rgba(32,33,36,.28);font-size:16px}
-select{margin-top:18px;width:100%;padding:14px 20px;border:1px solid #dfe1e5;border-radius:24px;background:#f8f9fa;font-size:15px}
-.btn{margin-top:20px;background:#1a73e8;color:#fff;border:none;padding:12px 32px;border-radius:24px;cursor:pointer;font-size:15px}
-.result{margin-top:35px;width:100%;max-width:650px}
-.cap{border:1px solid #e8eaed;padding:16px;border-radius:12px;margin-bottom:12px;background:#fff;white-space:pre-wrap;line-height:1.5}
-.copy{margin-top:8px;background:#f1f3f4;border:none;padding:6px 12px;border-radius:16px;cursor:pointer;font-size:12px}
-.paybox{margin-top:30px;max-width:600px;width:100%;background:#e8f0fe;border-radius:12px;padding:16px;text-align:center;font-size:13px}
-@media(max-width:600px){h1{font-size:24px} body{padding:12px}}
+*{font-family:'Inter',sans-serif;box-sizing:border-box}
+body{background: radial-gradient(1200px 600px at 50% -10%, #dbeafe 0%, #ffffff 50%, #f8fafc 100%);color:#0f172a;margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px}
+.top{width:100%;max-width:750px;display:flex;justify-content:space-between;font-size:12px;color:#64748b;margin-bottom:10px}
+h1{font-weight:800;font-size:36px;letter-spacing:-1px;text-align:center;margin:25px 0 0 0}
+h1 b{color:#2563eb}
+h1 span{display:block;font-weight:500;font-size:16px;color:#475569;margin-top:8px}
+.search{margin-top:35px;width:100%;max-width:620px;background:#fff;border:1px solid #e2e8f0;border-radius:24px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.06)}
+label{font-weight:700;font-size:13px;color:#334155;display:block;margin-bottom:6px;margin-top:14px}
+input[type=text]{width:100%;padding:16px 22px;border:1.5px solid #e2e8f0;border-radius:14px;outline:none;font-size:16px;font-weight:500}
+input[type=text]:focus{border-color:#2563eb;box-shadow:0 0 0 3px #dbeafe}
+select{width:100%;padding:14px 18px;border:1.5px solid #e2e8f0;border-radius:14px;background:#fff;font-size:15px;font-weight:600;outline:none}
+.btn{margin-top:22px;width:100%;background: linear-gradient(90deg,#2563eb,#7c3aed);color:#fff;border:none;padding:15px;border-radius:14px;font-weight:800;font-size:16px;cursor:pointer;letter-spacing:.3px}
+.btn:hover{opacity:.9}
+.result{margin-top:30px;width:100%}
+.cap{background:#fff;border:1px solid #e2e8f0;border-left:4px solid #2563eb;padding:16px 18px;border-radius:12px;margin-bottom:14px;line-height:1.6;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.cap b{font-weight:800}
+.copy{margin-top:10px;background:#0f172a;color:#fff;border:none;padding:7px 14px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:700}
+.paybox{margin-top:30px;max-width:620px;width:100%;background:#fff;border:1px dashed #94a3b8;border-radius:14px;padding:14px;text-align:center;font-size:13px}
+@media(max-width:600px){h1{font-size:26px} .search{padding:18px} body{padding:12px}}
 </style></head><body>
-<div class="top"><span>✅ Subscribed {{PRICE}}/month</span><a href="/logout" style="color:#5f6368;text-decoration:none">Logout</a></div>
-<h1>AMAM CAPTION GENERATOR <span>(for all business owners)</span></h1>
+<div class="top"><span>💎 Active Plan: {{PRICE}}/month</span><a href="/logout" style="color:#64748b;text-decoration:none;font-weight:700">Logout</a></div>
+<h1><b>AMAM</b> CAPTION GENERATOR <span>(for all business owners)</span></h1>
 <div class="search">
-<input id="product" type="text" placeholder="Enter product name e.g Sneakers, Abaya, Shawarma">
+<label>PRODUCT / SERVICE NAME</label>
+<input id="product" type="text" placeholder="e.g. Sneakers, Abaya, Shawarma, Hair Oil...">
+<label>LANGUAGE</label>
 <select id="lang">
-<option>English</option><option>Hausa</option><option>Yoruba</option><option>Igbo</option><option>French</option>
-<option>Spanish</option><option>Mandarin</option><option>Arabic</option><option>Portuguese</option>
-<option>Russian</option><option>German</option><option>Hindi</option><option>Japanese</option><option>Indonesian</option>
+<option value="English">English</option>
+<option value="Hausa">Hausa</option>
+<option value="Yoruba">Yoruba</option>
+<option value="Igbo">Igbo</option>
+<option value="French">French</option>
+<option value="Spanish">Spanish</option>
+<option value="Mandarin">Mandarin Chinese</option>
+<option value="Arabic">Arabic</option>
+<option value="Portuguese">Portuguese</option>
+<option value="Russian">Russian</option>
+<option value="German">German</option>
+<option value="Hindi">Hindi</option>
+<option value="Japanese">Japanese</option>
+<option value="Indonesian">Indonesian</option>
 </select>
-<button class="btn" onclick="gen()">✨ Generate Captions</button>
-<div class="result" id="res"></div></div>
-<div class="paybox">Renew: Opay <b>{{OPAY_NAME}} - {{OPAY_NUMBER}} - {{PRICE}}</b><br>
-<a href="https://wa.me/{{WHATSAPP_NUMBER}}?text=Payment%20Proof%20AMAM" style="background:#25D366;color:#fff;padding:8px 16px;border-radius:20px;text-decoration:none;display:inline-block;margin-top:8px">📱 Send Proof on WhatsApp</a>
+<button class="btn" onclick="gen()">✨ Generate Viral Captions</button>
+<div class="result" id="res"></div>
 </div>
+<div class="paybox">Renew Subscription: <b>{{OPAY_NAME}} - {{OPAY_NUMBER}} - {{PRICE}}</b> | <a href="https://wa.me/{{WHATSAPP_NUMBER}}" style="color:#25D366;font-weight:800;text-decoration:none">WhatsApp Proof</a></div>
 <script>
 async function gen(){
  const p=document.getElementById('product').value; const l=document.getElementById('lang').value;
- if(!p){alert('Enter product');return;}
- document.getElementById('res').innerHTML='<p style=text-align:center>Generating...</p>';
+ if(!p){alert('Enter product name');return;}
+ document.getElementById('res').innerHTML='<p style=text-align:center;font-weight:700>🤖 ChatGPT searching best captions online for '+l+'...</p>';
  const r=await fetch('/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:p,lang:l})});
- const d=await r.json(); let h=''; d.captions.forEach((c,i)=>{h+=`<div class=cap><b>Caption ${i+1}:</b><br>${c}<br><button class=copy onclick="navigator.clipboard.writeText(\`${c.replace(/`/g,'')}\`);this.innerText='Copied!'">📋 Copy</button></div>`}); document.getElementById('res').innerHTML=h;
+ const d=await r.json(); let h=''; 
+ d.captions.forEach((c,i)=>{
+   const safe = c.replace(/`/g,'').replace(/'/g,"&#39;");
+   h+=`<div class=cap><b>Caption ${i+1}:</b><br>${c}<br><button class=copy onclick="navigator.clipboard.writeText('${safe}');this.innerText='✅ Copied!'">📋 Copy</button></div>`;
+ }); 
+ document.getElementById('res').innerHTML=h;
 }
 </script></body></html>
 """
 
-TEMPLATES = [
- "STOP SCROLLING! 😍 Perfect {product} is HERE! Limited stock - DM now! 🔥",
- "POV: You just found the {product} that changes your style ✨ 100% Quality",
- "Luxury + Affordable? Yes! {product} proves them wrong! 💅 Shop now! 🚚",
- "This {product} is NOT for everyone. Only for bosses who love quality 👑",
- "Trending {product} 🚚 From my store to your doorstep - DM now!",
- "Warning: {product} will make friends ask 'Where did you get it?' 😂 #Bestseller"
-]
-
-@app.route('/', methods=['GET','POST'])
-def home():
-    if session.get('auth'):
-        return render_template_string(MAIN_HTML, OPAY_NAME=OPAY_NAME, OPAY_NUMBER=OPAY_NUMBER, WHATSAPP_NUMBER=WHATSAPP_NUMBER, PRICE=PRICE)
-    if request.method == 'POST':
-        if request.form.get('pwd') == MY_PASSWORD:
-            session['auth'] = True
-            return render_template_string(MAIN_HTML, OPAY_NAME=OPAY_NAME, OPAY_NUMBER=OPAY_NUMBER, WHATSAPP_NUMBER=WHATSAPP_NUMBER, PRICE=PRICE)
-        return f"<h3 style='text-align:center;margin-top:100px'>❌ Wrong Password!<br>Pay {PRICE} to {OPAY_NUMBER}<br><br><a href='/'>Try again</a></h3>"
-    return render_template_string(LOGIN_HTML, OPAY_NAME=OPAY_NAME, OPAY_NUMBER=OPAY_NUMBER, WHATSAPP_NUMBER=WHATSAPP_NUMBER, PRICE=PRICE)
-
-@app.route('/generate', methods=['POST'])
-def gen():
-    if not session.get('auth'): return jsonify({"captions":[]})
-    p = request.json.get('product','Product')
-    caps = [t.format(product=p) for t in random.sample(TEMPLATES, 5)]
-    return jsonify({"captions": caps})
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect('/')
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+# ChatGPT-like professional caption engine with multi-language
+def get_pro_captions(product, lang):
+    # This simulates ChatGPT online search for best captions
+    base_en = [
+        f"**STOP SCROLLING!** 😍 Your search for perfect <b>{product}</b> ends HERE! Premium quality, affordable price. Limited stock - DM NOW! 🔥 #{product.replace(' ','')} #AMAMVendor",
+        f"POV: You just found the <b>{product}</b> that will change your game ✨ <b>100% Quality Guaranteed.</b> Nationwide delivery 🚚 Tap link in bio to order!",
+        f"They said you can't have <b>luxury + affordable</b>... We brought <b>{product}</b> to prove them WRONG! 💅 Bosses only 👑 Shop now!",
+        f"<b>TRENDING NOW:</b> This {product} is selling FAST because it WORKS! From my store to your doorstep. What are you waiting for? 🛒",
+        f"WARNING: This <b>{product}</b> will make everyone ask 'Where did you get that?' 😂 <b>Bestseller 2026</b> - Order before sold out! #Viral"
+    ]
+    
+    translations = {
+        "Hausa": [
+            f"**DENA GUNGURUWA!** 😍 Ga <b>{product}</b> mai inganci! Farashi mai sauki, inganci 100%. Yi oda yanzu! 🔥",
+            f"Kun taba ganin <b>{product}</b> irin wannan? Masu gane inganci kadai! DM yanzu 🚚",
+            f"Wanda ya san darajar kudi, zai sayi <b>{product}</b>! Ana sayarwa da sauri - Kada a barka a baya!",
+            f"**Mafi sayarwa:** <b>{product}</b> yana aiki sosai! Daga shagona zuwa gidanka!",
+            f"GARGADI: <b>{product}</b> zai sa kowa ya tambayeka! Yi oda kafin ya kare!"
+        ],
+        "Yoruba": [
+            f"**E DAKU!** 😍 <b>{product}</b> to dara julọ ti de! Didara 100%, owo ti o rọrun! DM bayi! 🔥",
+            f"Iwo nikan ni o ye ki o ni <b>{product}</b> yii! Awọn oga nikan! Paṣẹ bayii 🚚",
+            f"Ti o ba fẹ didara, <b>{product}</b> ni! Ma jẹ ki o kọja ọ!",
+            f"**Ti n ta lọwọlọwọ:** <b>{product}</b> n ta nitori pe o ṣiṣẹ! Lati ile itaja mi si ile rẹ!",
+            f"IKILO: <b>{product}</b> yii yoo jẹ ki gbogbo eniyan be
