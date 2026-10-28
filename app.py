@@ -390,6 +390,8 @@ def dashboard():
 
 # ---------------- AI CAPTIONS ----------------
 
+# ---------------- AI CAPTIONS ----------------
+
 @app.route("/generate", methods=["POST"])
 @login_required
 @active_subscription_required
@@ -404,34 +406,75 @@ def generate():
         flash("Please enter valid product details.")
         return redirect(url_for("dashboard"))
 
-    api_key = os.environ.get("OPENAI_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         flash("AI service is not configured yet. Please contact the administrator.")
         return redirect(url_for("dashboard"))
 
+    prompt = (
+        "You write useful, persuasive marketing captions for Nigerian small businesses. "
+        "Never invent product features, discounts, stock levels, guarantees, or delivery promises. "
+        "Use only the facts supplied. Keep the language natural and suitable for WhatsApp Status. "
+        "Return exactly three distinct captions, clearly numbered 1, 2, and 3. "
+        "Do not add explanations.\n\n"
+        f"Product: {product}\n"
+        f"Price: {price or 'Not provided'}\n"
+        f"Details: {details or 'Not provided'}\n"
+        f"Language: {language}\n"
+        f"Style: {style}\n"
+        "Write three ready-to-post WhatsApp Status captions. "
+        "Use emojis where suitable and include a simple call to action."
+    )
+
     try:
-        client = OpenAI(api_key=api_key)
-        response = client.responses.create(
-            model=os.environ.get("OPENAI_TEXT_MODEL", "gpt-4.1-mini"),
-            instructions=(
-                "You write useful, persuasive marketing captions for Nigerian small businesses. "
-                "Never invent product features, discounts, stock levels, guarantees, or delivery promises. "
-                "Use only the facts supplied. Keep the language natural and suitable for WhatsApp Status. "
-                "Return exactly three distinct captions, clearly numbered 1, 2, and 3. "
-                "Do not add explanations."
-            ),
-            input=(
-                f"Product: {product}\nPrice: {price or 'Not provided'}\n"
-                f"Details: {details or 'Not provided'}\n"
-                f"Language: {language}\nStyle: {style}\n"
-                "Write three ready-to-post WhatsApp Status captions. "
-                "Use emojis where suitable and include a simple call to action."
-            )
+        response = requests.post(
+            "https://generativelanguage.googleapis.com/v1beta/"
+            "models/gemini-2.5-flash:generateContent",
+            headers={
+                "x-goog-api-key": api_key,
+                "Content-Type": "application/json",
+            },
+            json={
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": prompt}
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.8,
+                    "maxOutputTokens": 700,
+                },
+            },
+            timeout=30,
         )
-        captions = response.output_text
+
+        if not response.ok:
+            app.logger.error(
+                "Gemini API error: status=%s response=%s",
+                response.status_code,
+                response.text[:1000],
+            )
+            response.raise_for_status()
+
+        data = response.json()
+        captions = "\n".join(
+            part.get("text", "")
+            for candidate in data.get("candidates", [])
+            for part in candidate.get("content", {}).get("parts", [])
+            if part.get("text")
+        ).strip()
+
+        if not captions:
+            raise ValueError("Gemini returned no caption text.")
+
     except Exception:
-        app.logger.exception("Caption generation failed")
-        flash("Caption generation failed. Check the OpenAI API key, account billing, and Render logs.")
+        app.logger.exception("Gemini caption generation failed")
+        flash(
+            "Caption generation failed. Please try again later. "
+            "If the problem continues, contact the administrator."
+        )
         return redirect(url_for("dashboard"))
 
     return page("Your captions", """
@@ -443,6 +486,7 @@ def generate():
       <a class="button secondary" href="{{ url_for('dashboard') }}">Back to dashboard</a>
     </div>
     """, captions=captions)
+)
 
 
 # ---------------- ADVERT IMAGE CREATION ----------------
