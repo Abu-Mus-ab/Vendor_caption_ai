@@ -2,6 +2,7 @@ import os
 import io
 import hmac
 import hashlib
+import time
 import secrets
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -427,36 +428,47 @@ def generate():
     )
 
     try:
-        response = requests.post(
-            "https://generativelanguage.googleapis.com/v1beta/"
-           "models/gemini-3.8-flash:generateContent",
-            headers={
-                "x-goog-api-key": api_key,
-                "Content-Type": "application/json",
-            },
-            json={
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": prompt}
-                        ]
-                    }
-                ],
-                "generationConfig": {
-                    "temperature": 0.8,
-                    "maxOutputTokens": 700,
-                },
-            },
-            timeout=30,
-        )
+        
+response = None
 
-        if not response.ok:
-            app.logger.error(
-                "Gemini API error: status=%s response=%s",
-                response.status_code,
-                response.text[:1000],
-            )
-            response.raise_for_status()
+for attempt in range(3):
+    response = requests.post(
+        "https://generativelanguage.googleapis.com/v1beta/"
+        "models/gemini-3.8-flash:generateContent",
+        headers={
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json",
+        },
+        json={
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt}
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.8,
+                "maxOutputTokens": 700,
+            },
+        },
+        timeout=30,
+    )
+
+    if response.status_code not in (429, 503):
+        break
+
+    if attempt < 2:
+        time.sleep(2 ** (attempt + 1))
+
+if not response.ok:
+    app.logger.error(
+        "Gemini API error: status=%s response=%s",
+        response.status_code,
+        response.text[:1000],
+    )
+    response.raise_for_status()
+
 
         data = response.json()
         captions = "\n".join(
