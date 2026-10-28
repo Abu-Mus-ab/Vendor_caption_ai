@@ -429,9 +429,8 @@ def generate():
 
     try:
         response = None
-
-for attempt in range(3):
-    response = requests.post(
+         for attempt in range(3):
+          response = requests.post(
         "https://generativelanguage.googleapis.com/v1beta/"
         "models/gemini-3.8-flash:generateContent",
         headers={
