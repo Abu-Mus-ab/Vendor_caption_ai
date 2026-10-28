@@ -486,7 +486,7 @@ def generate():
       <a class="button secondary" href="{{ url_for('dashboard') }}">Back to dashboard</a>
     </div>
     """, captions=captions)
-)
+
 
 
 # ---------------- ADVERT IMAGE CREATION ----------------
