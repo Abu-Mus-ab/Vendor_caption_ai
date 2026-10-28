@@ -428,8 +428,7 @@ def generate():
     )
 
     try:
-        
-response = None
+        response = None
 
 for attempt in range(3):
     response = requests.post(
