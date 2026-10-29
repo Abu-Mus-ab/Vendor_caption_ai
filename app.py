@@ -479,7 +479,7 @@ Instructions:
                         "maxOutputTokens": 1000,
                     },
                 },
-                timeout=20,
+                timeout=60,
             )
 
             if response.status_code not in (429, 503):
