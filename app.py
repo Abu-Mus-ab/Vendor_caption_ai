@@ -396,6 +396,7 @@ def dashboard():
 @app.route("/generate", methods=["POST"])
 @login_required
 @active_subscription_required
+
 def generate():
     product = request.form.get("product", "").strip()
     price = request.form.get("price", "").strip()
@@ -429,40 +430,41 @@ def generate():
 
     try:
         response = None
+
         for attempt in range(3):
             response = requests.post(
-            "https://generativelanguage.googleapis.com/v1beta/"
-            "models/gemini-3.8-flash:generateContent",
-            headers={
-                "x-goog-api-key": api_key,
-                "Content-Type": "application/json",
-            },
-            json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.8,
-                    "maxOutputTokens": 700,
+                "https://generativelanguage.googleapis.com/v1beta/"
+                "models/gemini-3.8-flash:generateContent",
+                headers={
+                    "x-goog-api-key": api_key,
+                    "Content-Type": "application/json",
                 },
-            },
-            timeout=30,
-        )
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.8,
+                        "maxOutputTokens": 700,
+                    },
+                },
+                timeout=30,
+            )
 
-        if response.status_code not in (429, 503):
-            break
+            if response.status_code not in (429, 503):
+                break
 
-        if attempt < 2:
-            time.sleep(2 ** (attempt + 1))
+            if attempt < 2:
+                time.sleep(2 ** (attempt + 1))
 
-    if not response.ok:
-        app.logger.error(
-            "Gemini API error: status=%s response=%s",
-            response.status_code,
-            response.text[:1000],
-        )
-        response.raise_for_status()
-
+        if not response.ok:
+            app.logger.error(
+                "Gemini API error: status=%s response=%s",
+                response.status_code,
+                response.text[:1000],
+            )
+            response.raise_for_status()
 
         data = response.json()
+
         captions = "\n".join(
             part.get("text", "")
             for candidate in data.get("candidates", [])
@@ -490,6 +492,7 @@ def generate():
       <a class="button secondary" href="{{ url_for('dashboard') }}">Back to dashboard</a>
     </div>
     """, captions=captions)
+
 
 
 
