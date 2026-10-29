@@ -27,16 +27,35 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("COOKIE_SECURE", "true").lower() == "true"
 
-database_url = os.environ.get("DATABASE_URL", "sqlite:///vendor_caption_ai.db")
+
+database_url = os.environ.get(
+    "DATABASE_URL",
+    "sqlite:///vendor_caption_ai.db"
+)
+
 if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
+    database_url = database_url.replace(
+        "postgres://", "postgresql://", 1
+    )
+
 if database_url.startswith("postgresql://"):
-    database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    database_url = database_url.replace(
+        "postgresql://", "postgresql+psycopg://", 1
+    )
 
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+# Help SQLAlchemy detect and replace stale database connections.
+if database_url.startswith("postgresql+psycopg://"):
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+        "pool_timeout": 30,
+    }
+
 db = SQLAlchemy(app)
+
 
 PRICE_NAIRA = 3000
 PRICE_KOBO = PRICE_NAIRA * 100
