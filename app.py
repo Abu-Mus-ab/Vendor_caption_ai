@@ -432,20 +432,34 @@ def generate():
         flash("AI service is not configured yet. Please contact the administrator.")
         return redirect(url_for("dashboard"))
 
-    prompt = (
-        "You write useful, persuasive marketing captions for Nigerian small businesses. "
-        "Never invent product features, discounts, stock levels, guarantees, or delivery promises. "
-        "Use only the facts supplied. Keep the language natural and suitable for WhatsApp Status. "
-        "Return exactly three distinct captions, clearly numbered 1, 2, and 3. "
-        "Do not add explanations.\n\n"
-        f"Product: {product}\n"
-        f"Price: {price or 'Not provided'}\n"
-        f"Details: {details or 'Not provided'}\n"
-        f"Language: {language}\n"
-        f"Style: {style}\n"
-        "Write three ready-to-post WhatsApp Status captions. "
-        "Use emojis where suitable and include a simple call to action."
-    )
+    
+prompt = f"""
+You are a professional marketing copywriter for Nigerian small businesses.
+
+Create EXACTLY THREE ready-to-post WhatsApp Status captions for the product below.
+
+PRODUCT INFORMATION
+Product: {product}
+Price: {price or "Not provided"}
+Details: {details or "Not provided"}
+Language: {language}
+Style: {style}
+
+STRICT RULES:
+- Write actual advertising captions, not an explanation or checklist.
+- Number the captions 1, 2, and 3.
+- Make each caption different, attractive, and natural.
+- Use the requested language and style.
+- Use emojis where appropriate.
+- Include a simple call to action.
+- Use only information supplied above.
+- Never invent product features, discounts, guarantees, stock levels,
+  fabric details, or delivery promises.
+- If the price is missing, do not invent one.
+- Do not describe your instructions or explain your reasoning.
+- Output only the three captions.
+"""
+
 
     try:
         response = None
@@ -482,14 +496,37 @@ def generate():
             )
             response.raise_for_status()
 
-        data = response.json()
+        
+data = response.json()
 
-        captions = "\n".join(
-            part.get("text", "")
-            for candidate in data.get("candidates", [])
-            for part in candidate.get("content", {}).get("parts", [])
-            if part.get("text")
-        ).strip()
+candidates = data.get("candidates", [])
+if not candidates:
+    raise ValueError(
+        f"Gemini returned no candidates: {str(data)[:500]}"
+    )
+
+parts = candidates[0].get("content", {}).get("parts", [])
+captions = "\n".join(
+    part["text"].strip()
+    for part in parts
+    if isinstance(part.get("text"), str)
+    and part["text"].strip()
+).strip()
+
+if not captions:
+    raise ValueError("Gemini returned no caption text.")
+
+# Reject obvious incomplete or non-caption responses.
+if not any(
+    marker in captions
+    for marker in ("1.", "1)", "1:", "**1**")
+):
+    app.logger.warning(
+        "Gemini returned an unexpected caption format: %s",
+        captions[:500]
+    )
+    raise ValueError("Gemini returned an unexpected caption format.")
+
 
         if not captions:
             raise ValueError("Gemini returned no caption text.")
