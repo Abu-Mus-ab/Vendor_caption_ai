@@ -410,12 +410,10 @@ def dashboard():
 
 # ---------------- AI CAPTIONS ----------------
 
-# ---------------- AI CAPTIONS ----------------
 
 @app.route("/generate", methods=["POST"])
 @login_required
 @active_subscription_required
-
 def generate():
     product = request.form.get("product", "").strip()
     price = request.form.get("price", "").strip()
@@ -428,38 +426,34 @@ def generate():
         return redirect(url_for("dashboard"))
 
     api_key = os.environ.get("GEMINI_API_KEY")
+
     if not api_key:
-        flash("AI service is not configured yet. Please contact the administrator.")
+        flash("AI service is not configured. Please contact the administrator.")
         return redirect(url_for("dashboard"))
 
-    
-prompt = f"""
+    prompt = f"""
 You are a professional marketing copywriter for Nigerian small businesses.
 
-Create EXACTLY THREE ready-to-post WhatsApp Status captions for the product below.
+Write exactly THREE different, ready-to-post WhatsApp Status captions.
 
-PRODUCT INFORMATION
 Product: {product}
 Price: {price or "Not provided"}
 Details: {details or "Not provided"}
 Language: {language}
 Style: {style}
 
-STRICT RULES:
-- Write actual advertising captions, not an explanation or checklist.
+Instructions:
 - Number the captions 1, 2, and 3.
-- Make each caption different, attractive, and natural.
+- Make each caption attractive, natural, and different.
 - Use the requested language and style.
-- Use emojis where appropriate.
+- Use emojis where suitable.
 - Include a simple call to action.
-- Use only information supplied above.
-- Never invent product features, discounts, guarantees, stock levels,
-  fabric details, or delivery promises.
-- If the price is missing, do not invent one.
-- Do not describe your instructions or explain your reasoning.
-- Output only the three captions.
+- Use only the information provided.
+- Never invent product features, discounts, guarantees,
+  stock levels, fabric details, or delivery promises.
+- Do not explain your process.
+- Return only the three captions.
 """
-
 
     try:
         response = None
@@ -473,20 +467,26 @@ STRICT RULES:
                     "Content-Type": "application/json",
                 },
                 json={
-                    "contents": [{"parts": [{"text": prompt}]}],
+                    "contents": [
+                        {
+                            "parts": [
+                                {"text": prompt}
+                            ]
+                        }
+                    ],
                     "generationConfig": {
                         "temperature": 0.8,
-                        "maxOutputTokens": 700,
+                        "maxOutputTokens": 1000,
                     },
                 },
-                timeout=30,
+                timeout=20,
             )
 
             if response.status_code not in (429, 503):
                 break
 
             if attempt < 2:
-                time.sleep(2 ** (attempt + 1))
+                time.sleep(attempt + 1)
 
         if not response.ok:
             app.logger.error(
@@ -496,58 +496,60 @@ STRICT RULES:
             )
             response.raise_for_status()
 
-        
-data = response.json()
+        data = response.json()
+        candidates = data.get("candidates", [])
 
-candidates = data.get("candidates", [])
-if not candidates:
-    raise ValueError(
-        f"Gemini returned no candidates: {str(data)[:500]}"
-    )
+        if not candidates:
+            app.logger.error(
+                "Gemini returned no candidates: %s",
+                str(data)[:1000],
+            )
+            raise ValueError("Gemini returned no captions.")
 
-parts = candidates[0].get("content", {}).get("parts", [])
-captions = "\n".join(
-    part["text"].strip()
-    for part in parts
-    if isinstance(part.get("text"), str)
-    and part["text"].strip()
-).strip()
+        parts = candidates[0].get("content", {}).get("parts", [])
 
-if not captions:
-    raise ValueError("Gemini returned no caption text.")
-
-# Reject obvious incomplete or non-caption responses.
-if not any(
-    marker in captions
-    for marker in ("1.", "1)", "1:", "**1**")
-):
-    app.logger.warning(
-        "Gemini returned an unexpected caption format: %s",
-        captions[:500]
-    )
-    raise ValueError("Gemini returned an unexpected caption format.")
-
+        captions = "\n".join(
+            part["text"].strip()
+            for part in parts
+            if isinstance(part.get("text"), str)
+            and part["text"].strip()
+        ).strip()
 
         if not captions:
-            raise ValueError("Gemini returned no caption text.")
+            raise ValueError("Gemini returned empty caption text.")
 
     except Exception:
         app.logger.exception("Gemini caption generation failed")
         flash(
-            "Caption generation failed. Please try again later. "
-            "If the problem continues, contact the administrator."
+            "Caption generation failed. Please try again later."
         )
         return redirect(url_for("dashboard"))
 
-    return page("Your captions", """
-    <div class="card">
-      <h1>Your 3 captions</h1>
-      <p class="muted">Review product details and prices before posting.</p>
-      <div class="result" id="captions">{{ captions }}</div>
-      <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('captions').innerText).then(()=>alert('Copied'))">Copy captions</button>
-      <a class="button secondary" href="{{ url_for('dashboard') }}">Back to dashboard</a>
-    </div>
-    """, captions=captions)
+    return page(
+        "Your captions",
+        """
+        <div class="card">
+          <h1>Your 3 captions</h1>
+          <p class="muted">
+            Review product details and prices before posting.
+          </p>
+          <div class="result" id="captions"
+               style="white-space: pre-wrap;">{{ captions }}</div>
+          <button type="button"
+            onclick="navigator.clipboard.writeText(
+              document.getElementById('captions').innerText
+            ).then(() => alert('Copied')).catch(() => alert('Please copy the text manually.'))">
+            Copy captions
+          </button>
+          <a class="button secondary"
+             href="{{ url_for('dashboard') }}">
+            Back to dashboard
+          </a>
+        </div>
+        """,
+        captions=captions,
+    )
+
 
 
 
